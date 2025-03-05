@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vilmora - Basic Photo Color Grader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3182ce;
+            --secondary-color: #4a5568;
+            --background-color: #f7fafc;
+            --text-color: #1a202c;
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #63b3ed;
+            --secondary-color: #cbd5e0;
+            --background-color: #1a202c;
+            --text-color: #f7fafc;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .editor-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 20px;
+            transition: opacity 0.3s ease;
+        }
+
+        .canvas-container {
+            flex: 2;
+            background-color: var(--background-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border: 2px dashed var(--secondary-color);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .canvas-container.dragover {
+            border-color: var(--primary-color);
+            background-color: rgba(99, 179, 237, 0.1);
+        }
+
+        .tools-container {
+            flex: 1;
+            background-color: var(--background-color);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .slider-container {
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.875rem;
+            color: var(--secondary-color);
+        }
+
+        .advanced-slider {
+            width: 100%;
+            height: 8px;
+            background: var(--background-color);
+            outline: none;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .preset-button {
+            background-color: var(--background-color);
+            border: 1px solid var(--secondary-color);
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .preset-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            border-radius: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Existing styles remain the same, adding new media queries at the end */
+
+/* Mobile Responsiveness */
+@media screen and (max-width: 768px) {
+    .editor-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .canvas-container {
+        min-height: 300px;
+        max-height: 500px;
+    }
+
+    .tools-container {
+        width: 100%;
+        padding: 15px;
+    }
+
+    .theme-toggle {
+        top: 10px;
+        right: 10px;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .slider-container {
+        margin-bottom: 10px;
+    }
+
+    .preset-button {
+        padding: 6px 10px;
+        margin: 3px;
+        font-size: 0.8rem;
+    }
+
+    .flex-gap-2 {
+        flex-direction: column;
+    }
+
+    button {
+        font-size: 0.9rem;
+        padding: 8px 12px;
+    }
+
+    .grid-cols-2 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .space-x-2 > * {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Extra Small Devices */
+@media screen and (max-width: 480px) {
+    body {
+        padding: 10px;
+    }
+
+    .editor-container {
+        gap: 5px;
+    }
+
+    .canvas-container {
+        min-height: 250px;
+    }
+
+    h1 {
+        font-size: 1.3rem;
+    }
+
+    .preset-button {
+        padding: 4px 8px;
+        margin: 2px;
+        font-size: 0.7rem;
+    }
+
+    .tools-container {
+        padding: 10px;
+    }
+
+    button {
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+}
+
+/* Touch Device Improvements */
+@media (pointer: coarse) {
+    /* Increase touch target sizes */
+    .preset-button,
+    button,
+    input[type="range"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    input[type="file"] {
+        height: 60px;
+    }
+}
+    </style>
+</head>
+<body class="p-6">
+    <div class="container mx-auto">
+        <button id="themeToggle" class="theme-toggle p-3 rounded-full bg-opacity-20 backdrop-blur-sm">
+            <i class="fas fa-moon text-xl"></i>
+        </button>
+
+        <h1 class="text-3xl font-bold text-center mb-6">Vilmora - Basic Photo Color Grader</h1>
+        
+        <div class="editor-container">
+            <div class="canvas-container rounded-lg shadow-lg p-4">
+                <div class="loading-overlay">
+                    <div class="text-center">
+                        <i class="fas fa-spinner spinner text-4xl mb-2"></i>
+                        <p>Processing...</p>
+                    </div>
+                </div>
+                <canvas id="photoCanvas" class="max-w-full transition-all duration-300"></canvas>
+            </div>
+
+            <div class="tools-container">
+                <!-- File Input -->
+                <div class="mb-4 relative">
+                    <input type="file" id="imageUpload" accept="image/*" 
+                           class="w-full p-2 border rounded-lg cursor-pointer bg-transparent border-dashed">
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span class="text-sm opacity-70"></span>
+                    </div>
+                </div>
+
+                <!-- Adjustment Sliders -->
+                <div class="space-y-6">
+                    <div class="slider-container">
+                        <div class="flex justify-between mb-1">
+                            <label>Brightness</label>
+                            <span class="value-display" data-for="brightnessSlider">100%</span>
+                        </div>
+                        <input type="range" id="brightnessSlider" 
+                               min="0" max="200" value="100" 
+                               class="advanced-slider">
+                    </div>
+
+                    <div class="slider-container">
+                        <div class="flex justify-between mb-1">
+                            <label>Contrast</label>
+                            <span class="value-display" data-for="contrastSlider">100%</span>
+                        </div>
+                        <input type="range" id="contrastSlider" 
+                               min="0" max="200" value="100" 
+                               class="advanced-slider">
+                    </div>
+
+                    <div class="slider-container">
+                        <div class="flex justify-between mb-1">
+                            <label>Saturation</label>
+                            <span class="value-display" data-for="saturationSlider">100%</span>
+                        </div>
+                        <input type="range" id="saturationSlider" 
+                               min="0" max="200" value="100" 
+                               class="advanced-slider">
+                    </div>
+
+                    <div class="slider-container">
+                        <div class="flex justify-between mb-1">
+                            <label>Temperature</label>
+                            <span class="value-display" data-for="temperatureSlider">0%</span>
+                        </div>
+                        <input type="range" id="temperatureSlider" 
+                               min="-100" max="100" value="0" 
+                               class="advanced-slider">
+                    </div>
+                </div>
+
+                <!-- New Features -->
+                <div class="mt-6 space-y-4">
+                    <div class="flex gap-2">
+                        <button id="resetBtn" class="bg-red-500 text-white px-4 py-2 rounded-lg 
+                            hover:bg-red-600 transition-all">
+                            <i class="fas fa-undo"></i> Reset
+                        </button>
+                        <button id="grayscaleBtn" class="bg-gray-500 text-white px-4 py-2 rounded-lg 
+                            hover:bg-gray-600 transition-all">
+                            Grayscale
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="zoomInBtn" class="bg-blue-500 text-white p-2 rounded-lg">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button id="zoomOutBtn" class="bg-blue-500 text-white p-2 rounded-lg">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Preset Filters -->
+                <div class="mt-4">
+                    <h3 class="text-lg font-semibold mb-2">Presets</h3>
+                    <div class="flex flex-wrap">
+                        <button class="preset-button" data-preset="vintage">Vintage</button>
+                        <button class="preset-button" data-preset="cinematic">Cinematic</button>
+                        <button class="preset-button" data-preset="summer">Summer</button>
+                    </div>
+                </div>
+
+                <!-- Image Manipulation Buttons -->
+                <div class="mt-4 flex space-x-2">
+                    <button id="rotateBtn" class="bg-blue-500 text-white px-4 py-2 rounded">
+                        <i class="fas fa-rotate"></i> Rotate
+                    </button>
+                    <button id="flipBtn" class="bg-green-500 text-white px-4 py-2 rounded">
+                        <i class="fas fa-sync"></i> Flip
+                    </button>
+                </div>
+
+                <!-- Export Buttons -->
+                <div class="mt-4 flex space-x-2">
+                    <button id="saveBtn" class="bg-purple-500 text-white px-4 py-2 rounded">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                    <button id="downloadBtn" class="bg-indigo-500 text-white px-4 py-2 rounded">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    
+    class PhotoEditor {
+    constructor(canvasElement) {
+        this.canvas = canvasElement;
+        this.ctx = this.canvas.getContext('2d');
+        this.originalImage = null;
+        this.currentImage = null;
+        
+        this.state = {
+            brightness: 100,
+            contrast: 100,
+            saturation: 100,
+            temperature: 0,
+            rotation: 0,
+            flipped: false
+        };
+
+        this.zoomLevel = 1;
+        this.isDragging = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.offset = { x: 0, y: 0 };
+
+        this.presets = {
+            vintage: {
+                brightness: 90,
+                contrast: 110,
+                saturation: 80,
+                temperature: 20
+            },
+            cinematic: {
+                brightness: 95,
+                contrast: 110,
+                saturation: 90,
+                temperature: -10
+            },
+            summer: {
+                brightness: 105,
+                contrast: 100,
+                saturation: 120,
+                temperature: 30
+            }
+        };
+
+        this.initializeEventListeners();
+        this.initializeDragDrop();
+        this.initializeZoom();
+        this.initializeSliderDisplays();
+        this.initializeThemeToggle();
+
+        // Handle window resize to adjust canvas
+        window.addEventListener('resize', this.handleWindowResize.bind(this));
+    }
+
+    handleWindowResize() {
+        if (this.originalImage) {
+            this.fitImageToCanvas();
+            this.processImage();
+        }
+    }
+
+    initializeEventListeners() {
+        // Image Upload
+        document.getElementById('imageUpload').addEventListener('change', this.handleImageUpload.bind(this));
+
+        // Adjustment Sliders
+        document.getElementById('brightnessSlider').addEventListener('input', this.adjustBrightness.bind(this));
+        document.getElementById('contrastSlider').addEventListener('input', this.adjustContrast.bind(this));
+        document.getElementById('saturationSlider').addEventListener('input', this.adjustSaturation.bind(this));
+        document.getElementById('temperatureSlider').addEventListener('input', this.adjustTemperature.bind(this));
+        
+        // Image Manipulation Buttons
+        document.getElementById('rotateBtn').addEventListener('click', this.rotateImage.bind(this));
+        document.getElementById('flipBtn').addEventListener('click', this.flipImage.bind(this));
+        
+        // Export Buttons
+        document.getElementById('downloadBtn').addEventListener('click', this.downloadImage.bind(this));
+        document.getElementById('saveBtn').addEventListener('click', this.saveImage.bind(this));
+        
+        // Preset Filters
+        document.querySelectorAll('.preset-button').forEach(button => {
+            button.addEventListener('click', () => this.applyPreset(button.dataset.preset));
+        });
+
+        // Additional Buttons
+        document.getElementById('resetBtn').addEventListener('click', this.reset.bind(this));
+        document.getElementById('grayscaleBtn').addEventListener('click', this.applyGrayscale.bind(this));
+        document.getElementById('zoomInBtn').addEventListener('click', () => this.adjustZoom(1.1));
+        document.getElementById('zoomOutBtn').addEventListener('click', () => this.adjustZoom(0.9));
+    }
+
+    initializeSliderDisplays() {
+        const sliders = ['brightnessSlider', 'contrastSlider', 'saturationSlider', 'temperatureSlider'];
+        sliders.forEach(sliderId => {
+            const slider = document.getElementById(sliderId);
+            const display = document.querySelector(`.value-display[data-for="${sliderId}"]`);
+            
+            slider.addEventListener('input', (e) => {
+                display.textContent = `${e.target.value}%`;
+            });
+        });
+    }
+
+    initializeThemeToggle() {
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark');
+            body.setAttribute('data-theme', body.classList.contains('dark') ? 'dark' : 'light');
+            
+            // Toggle icon
+            const icon = themeToggle.querySelector('i');
+            icon.classList.toggle('fa-moon');
+            icon.classList.toggle('fa-sun');
+        });
+    }
+
+    initializeDragDrop() {
+        const container = document.querySelector('.canvas-container');
+        
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            container.classList.add('dragover');
+        });
+
+        container.addEventListener('dragleave', () => {
+            container.classList.remove('dragover');
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            container.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) {
+                this.handleImageUpload({ target: { files: e.dataTransfer.files } });
+            }
+        });
+    }
+
+    initializeZoom() {
+        const canvas = this.canvas;
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            this.adjustZoom(delta);
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.dragStart = { x: e.offsetX, y: e.offsetY };
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (this.isDragging) {
+                this.offset.x += e.offsetX - this.dragStart.x;
+                this.offset.y += e.offsetY - this.dragStart.y;
+                this.dragStart = { x: e.offsetX, y: e.offsetY };
+                this.processImage();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            this.isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+        });
+    }
+
+    fitImageToCanvas() {
+        const container = this.canvas.parentElement;
+        const maxWidth = container.clientWidth - 40; // Subtract padding
+        const maxHeight = container.clientHeight - 40; // Subtract padding
+
+        const imgRatio = this.originalImage.width / this.originalImage.height;
+        const containerRatio = maxWidth / maxHeight;
+
+        let canvasWidth, canvasHeight;
+
+        if (imgRatio > containerRatio) {
+            // Image is wider relative to container
+            canvasWidth = Math.min(this.originalImage.width, maxWidth);
+            canvasHeight = canvasWidth / imgRatio;
+        } else {
+            // Image is taller relative to container
+            canvasHeight = Math.min(this.originalImage.height, maxHeight);
+            canvasWidth = canvasHeight * imgRatio;
+        }
+
+        // Set canvas dimensions to match the scaled image
+        this.canvas.width = canvasWidth;
+        this.canvas.height = canvasHeight;
+
+        // Reset zoom and offset
+        this.zoomLevel = 1;
+        this.offset = { x: 0, y: 0 };
+    }
+
+    handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        const loadingOverlay = document.querySelector('.loading-overlay');
+
+        // Show loading overlay
+        loadingOverlay.style.display = 'flex';
+
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                this.originalImage = img;
+                this.fitImageToCanvas();
+                this.processImage();
+                
+                // Hide loading overlay
+                loadingOverlay.style.display = 'none';
+            };
+            img.src = e.target.result;
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    processImage() {
+        if (!this.originalImage) return;
+
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.ctx.save();
+        
+        // Center the image and apply transformations
+        this.ctx.translate(this.canvas.width / 2 + this.offset.x, this.canvas.height / 2 + this.offset.y);
+        this.ctx.scale(this.zoomLevel, this.zoomLevel);
+        this.ctx.rotate(this.state.rotation * Math.PI / 180);
+        this.ctx.scale(this.state.flipped ? -1 : 1, 1);
+        
+        // Draw the image scaled to the canvas size
+        this.ctx.drawImage(
+            this.originalImage, 
+            -this.originalImage.width / 2, 
+            -this.originalImage.height / 2, 
+            this.originalImage.width, 
+            this.originalImage.height
+        );
+        
+        this.ctx.restore();
+        this.applyImageFilters();
+    }
+
+    applyImageFilters() {
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            // Brightness
+            const brightness = this.state.brightness / 100;
+            data[i] *= brightness;     // Red
+            data[i + 1] *= brightness; // Green
+            data[i + 2] *= brightness; // Blue
+
+            // Contrast
+            const contrast = this.state.contrast / 100;
+            data[i] = ((data[i] / 255 - 0.5) * contrast + 0.5) * 255;
+            data[i + 1] = ((data[i + 1] / 255 - 0.5) * contrast + 0.5) * 255;
+            data[i + 2] = ((data[i + 2] / 255 - 0.5) * contrast + 0.5) * 255;
+
+            // Saturation
+            const saturation = this.state.saturation / 100;
+            if (saturation !== 1) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg + (data[i] - avg) * saturation;
+                data[i + 1] = avg + (data[i + 1] - avg) * saturation;
+                data[i + 2] = avg + (data[i + 2] - avg) * saturation;
+            }
+
+            // Temperature (color temperature adjustment)
+            const temp = this.state.temperature / 100;
+            data[i] += temp * 20;     // Red channel
+            data[i + 2] -= temp * 20; // Blue channel
+        }
+
+        this.ctx.putImageData(imageData, 0, 0);
+    }
+
+    adjustBrightness(event) {
+        this.state.brightness = event.target.value;
+        this.processImage();
+    }
+
+    adjustContrast(event) {
+        this.state.contrast = event.target.value;
+        this.processImage();
+    }
+
+    adjustSaturation(event) {
+        this.state.saturation = event.target.value;
+        this.processImage();
+    }
+
+    adjustTemperature(event) {
+        this.state.temperature = event.target.value;
+        this.processImage();
+    }
+
+    adjustZoom(delta) {
+        const MAX_ZOOM = Math.max(this.canvas.width, this.canvas.height) / 100;
+        const MIN_ZOOM = 0.1;
+
+        this.zoomLevel *= delta;
+        this.zoomLevel = Math.min(Math.max(MIN_ZOOM, this.zoomLevel), MAX_ZOOM);
+        this.processImage();
+    }
+
+    rotateImage() {
+        this.state.rotation += 90;
+        if (this.state.rotation >= 360) {
+            this.state.rotation = 0;
+        }
+        this.processImage();
+    }
+
+    flipImage() {
+        this.state.flipped = !this.state.flipped;
+        this.processImage();
+    }
+
+    applyPreset(presetName) {
+        const preset = this.presets[presetName];
+        if (!preset) return;
+
+        // Update state and UI sliders
+        Object.keys(preset).forEach(key => {
+            this.state[key] = preset[key];
+            const slider = document.getElementById(`${key}Slider`);
+            const display = document.querySelector(`.value-display[data-for="${key}Slider"]`);
+            
+            if (slider && display) {
+                slider.value = preset[key];
+                display.textContent = `${preset[key]}%`;
+            }
+        });
+
+        this.processImage();
+    }
+
+    applyGrayscale() {
+        if (!this.originalImage) return;
+
+        const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            data[i] = avg;     // Red
+            data[i + 1] = avg; // Green
+            data[i + 2] = avg; // Blue
+        }
+
+        this.ctx.putImageData(imageData, 0, 0);
+    }
+
+    reset() {
+        // Reset state
+        this.state = {
+            brightness: 100,
+            contrast: 100,
+            saturation: 100,
+            temperature: 0,
+            rotation: 0,
+            flipped: false
+        };
+
+        // Reset UI sliders
+        const sliders = ['brightnessSlider', 'contrastSlider', 'saturationSlider', 'temperatureSlider'];
+        sliders.forEach(sliderId => {
+            const slider = document.getElementById(sliderId);
+            const display = document.querySelector(`.value-display[data-for="${sliderId}"]`);
+            
+            slider.value = 100;
+            display.textContent = '100%';
+        });
+
+        // Reset canvas
+        this.zoomLevel = 1;
+        this.offset = { x: 0, y: 0 };
+
+        this.processImage();
+    }
+
+    downloadImage() {
+        if (!this.canvas) return;
+
+        // Create a temporary link to download the image
+        const link = document.createElement('a');
+        link.download = 'edited_image.png';
+        link.href = this.canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    saveImage() {
+        // In a real-world application, this would typically 
+        // involve sending the image to a server
+        alert('Changes Saved! Image Ready to Export!');
+    }
+}
+
+// Initialize the photo editor when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('photoCanvas');
+    window.photoEditor = new PhotoEditor(canvas);
+});
+              
+    
+</script>
+</body>
+</html>
